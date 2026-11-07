@@ -179,6 +179,7 @@ def paper_pipeline():
         project_root = Path(__file__).resolve().parents[1]
         db_path = project_root / "data" / "papers.db"
 
+        #Db connection to extract all the paper to display in the html
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         papers_rows = cur.execute("""
@@ -188,6 +189,7 @@ def paper_pipeline():
 
         #print(f"found{len(papers_rows)} papers in database")
 
+        # uses the javascript function defined at the end of thefunction
         html = """
                 <!DOCTYPE html>
                 <html lang="en">
@@ -197,12 +199,29 @@ def paper_pipeline():
                 </head>
                 <body>
                     <h1>Research Paper Library</h1>
+                    <label for="category">Filter by category:</label>
+                    <select id="category" onchange="filter_papers()">
+                        <option value="all">All categories</option>
+                    
             """
+        
+        categories = set() # set that contains unique categories
+        for filename, title, summary, keywords, category in papers_rows:
+            categories.add(category)
 
+        category_options = "" 
+        for category in sorted(categories):
+            category_options += f'<option value="{escape(category)}">'
+            category_options += f'{escape(category)}</option>'
+            
+        html += category_options + """
+                </select>
+                """ 
+        
         for filename, title, summary, keywords, category in papers_rows:
             keywords_list = json.loads(keywords)
             html += f"""
-                        <article>
+                        <article class="paper" data-category="{escape(category)}">
                         <h2>Title: {escape(title)}</h2>
                         <p>Summary: {escape(summary)}</p>
                         <p>Keywords: {escape(", ".join(keywords_list))}</p>
@@ -210,7 +229,22 @@ def paper_pipeline():
                         </article>
                     """
 
-        html += """
+        # javascript to display only papers that match the selected category
+        html += """ 
+                    <script>
+                        function filter_papers() {
+                            const selected_category = document.getElementById("category").value;
+                            const papers = document.querySelectorAll(".paper");
+                            papers.forEach(paper => {
+                                if(selected_category === "all" || paper.dataset.category === selected_category){
+                                    paper.style.display = "block";
+                                }
+                                else{
+                                    paper.style.display = "none";
+                                }
+                            });
+                        }
+                    </script>
                 </body>
                 </html>
                 """
