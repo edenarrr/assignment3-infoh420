@@ -4,6 +4,7 @@ import sqlite3
 from pymupdf4llm import to_markdown
 from openai import OpenAI
 import json
+from html import escape
 
 from airflow.sdk import dag, task
 
@@ -165,7 +166,7 @@ def paper_pipeline():
                 INSERT INTO papers (filename, title, summary, keywords, category)
                 VALUES(?, ?, ?, ?, ?)
             """,
-            (metadata["filename"], metadata_dict["title"], metadata_dict["summary"], json.dumps(metadata_dict["keywords"]), metadata_dict["category"])
+            (metadata["filename"], metadata_dict["title"], metadata_dict["summary"], json.dumps(metadata_dict["keywords"]), metadata_dict["category"]) # Here keyword are stored as json string
         )
 
         print(f"Saved metadata for {metadata['filename']}")
@@ -173,12 +174,62 @@ def paper_pipeline():
         conn.commit()
         conn.close()
 
+    @task
+    def generate_html():
+        project_root = Path(__file__).resolve().parents[1]
+        db_path = project_root / "data" / "papers.db"
+
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        papers_rows = cur.execute("""
+            SELECT filename, title, summary, keywords, category FROM papers
+        """).fetchall()
+        conn.close()
+
+        #print(f"found{len(papers_rows)} papers in database")
+
+        html = """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Research Library</title>
+                </head>
+                <body>
+                    <h1>Research Paper Library</h1>
+            """
+
+        for filename, title, summary, keywords, category in papers_rows:
+            keywords_list = json.loads(keywords)
+            html += f"""
+                        <article>
+                        <h2>Title: {escape(title)}</h2>
+                        <p>Summary: {escape(summary)}</p>
+                        <p>Keywords: {escape(", ".join(keywords_list))}</p>
+                        <p>Category: {escape(category)}</p>
+                        </article>
+                    """
+
+        html += """
+                </body>
+                </html>
+                """
+
+        output_folder = Path("/Users/eden/Library/CloudStorage/GoogleDrive-zukatry@gmail.com/My Drive/ResearchLibrary/output")
+        output_folder.mkdir(parents=True, exist_ok=True)
+        html_path = output_folder/"index.html"
+        html_path.write_text(html)
+
+    @task
+    def notify_discord():
+        ...
+
 
 
     pdfs = find_papers()
     markdown_results = convert_to_markdown.expand(pdf_path=pdfs)
     metadata_results = generate_metadata.expand(markdown=markdown_results)
-    save_metadata_to_database.expand(metadata=metadata_results)
+    save_metadata_to_database.expand(metadata=metadata_results) >> generate_html()
 
 
 
