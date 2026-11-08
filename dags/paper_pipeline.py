@@ -124,15 +124,8 @@ def paper_pipeline():
             max_retries=0,
         )
         markdown_text = Path(markdown["markdown_path"]).read_text(encoding="utf-8")
-        # The paper must fit in the model's context. Characters only give a rough estimate.
-        limit = int(os.environ.get("MAX_PAPER_CHARACTERS", "24000"))
-        if len(markdown_text) > limit:
-            raise ValueError(
-                f"{markdown['filename']} has {len(markdown_text)} characters (limit {limit}). "
-                "Increase the model context window and MAX_PAPER_CHARACTERS together. "
-                "The paper has not been truncated or saved."
-            )
         # Same message format as in the LLM practical: system instructions, then user input.
+        # only passing 6000 first characters of the file so that it can fit in llm context
         messages = [
             {
                 "role": "system",
@@ -145,7 +138,7 @@ def paper_pipeline():
             },
             {
                 "role": "user",
-                "content": "Analyse this paper and generate its metadata:\n" + markdown_text,
+                "content": "Analyse this paper and generate its metadata:\n" + markdown_text[:6000],
             },
         ]
         options = {}
