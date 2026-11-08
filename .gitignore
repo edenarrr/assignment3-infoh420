@@ -1,11 +1,12 @@
-# python files
+# Python
 __pycache__/
 *.pyc
 .venv/
 
-# local sqlite database
-data/*.db
+# Local databases, Markdown artifacts and Airflow credentials/logs
+data/*
+!data/.gitkeep
+.airflow/
 .env
-
-# mac
+# macOS
 .DS_Store
