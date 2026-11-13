@@ -1,5 +1,9 @@
 # Assignment 3 - Research Library
 
+Group: Irène Soffack Mafoken, Rahman Tektas, Eden Aroch
+
+Report: [report/report.pdf](report/report.pdf)
+
 We use an Airflow DAG to process research papers placed in a Google Drive folder.
 For each new PDF, we extract the text, ask a local LLM for metadata and save the
 result in SQLite. We then update an HTML page and send a Discord notification.
@@ -37,6 +41,12 @@ activate it, then run `pip install -r requirements.lock.txt`.
 The dependency file contains the versions used for testing, including Airflow 3.1.0,
 OpenAI 1.109.0 and PyMuPDF4LLM 2.1.
 
+On Windows, use WSL (Ubuntu). Clone the project inside the WSL home folder
+(for example `~/assignment3-infoh420`), not in a OneDrive or `C:` folder.
+If you copy files from Windows, convert the line endings first, otherwise
+`source scripts/env.sh` fails:
+`sed -i 's/\r$//' scripts/env.sh .env`
+
 ## Folders and settings
 
 Create a `ResearchLibrary` folder in your Google Drive-synced directory, with
@@ -53,6 +63,7 @@ match Ollama. The other settings below are optional; add them if needed.
 | `LOCAL_LLM_BASE_URL` | Your local model server's URL |
 | `LOCAL_LLM_MODEL` | The name of the model loaded on that server |
 | `DISCORD_WEBHOOK_URL` | The webhook URL for your Discord channel |
+| `PDF_SETTLE_SECONDS` | Seconds to wait after a PDF changes before reading it (default 30) |
 
 The SQLite database must stay outside Google Drive. Airflow has its own database
 under `.airflow/`; our `papers.db` only stores paper metadata. Markdown files are
@@ -84,11 +95,10 @@ export LOCAL_LLM_API_KEY='lm-studio'
 export LOCAL_LLM_MODEL='the-model-name-shown-in-LM-Studio'
 ```
 
-The paper, prompt and answer must fit in the model's context. The code accepts up
-to 24,000 characters by default. Start with a context such as 16,384 tokens if your
-model supports it, but remember that characters and tokens are different. For a
-longer paper, increase both the server's context size and `MAX_PAPER_CHARACTERS`.
-The task stops if the text exceeds the limit; it does not cut off the end.
+The paper, prompt and answer must fit in the model's context. To stay within
+the context of small local models, only the first 6,000 characters of the
+Markdown are sent to the model (title, abstract and introduction). The rest
+of the paper is not used for the metadata.
 
 If your server does not support JSON mode, set `LOCAL_LLM_JSON_MODE=0`. The JSON
 parsing and single retry still apply. If the server runs on Windows and Airflow
